@@ -142,5 +142,106 @@ from runner_orders GROUP BY runner_id;
 ```
 ## What is the successful delivery percentage for each runner?
 ```sql
+with cte as(select RUNNER_ID, count(RUNNER_ID) as tot_delivery from runner_orders group by RUNNER_ID),
+cte1 as (select RUNNER_ID, count(RUNNER_ID) as tot_successful_delivery from runner_orders 
+where CANCELLATION is null or CANCELLATION ='null' group by RUNNER_ID)
+select c.RUNNER_ID, tot_delivery, tot_successful_delivery, 
+(TOT_SUCCESSFUL_DELIVERY/TOT_DELIVERY * 100) as successful_delivery_percentage
+from cte c join cte1 c1 on c.RUNNER_ID=c1.RUNNER_ID;
 
+```
+<h1>C. Ingredient Optimisation</h1>
+ 
+## What are the standard ingredients for each pizza?
+```sql
+with cte as (SELECT pizza_id,
+       TRIM(REGEXP_SUBSTR(toppings, '[^,]+', 1, LEVEL)) AS topping
+FROM pizza_recipes
+CONNECT BY REGEXP_SUBSTR(toppings, '[^,]+', 1, LEVEL) IS NOT NULL
+AND PRIOR pizza_id = pizza_id
+AND PRIOR DBMS_RANDOM.VALUE IS NOT NULL
+ORDER BY pizza_id, LEVEL)
+SELECT  pizza_id, TOPPING_NAME from cte p1 join pizza_toppings p2 on p1.topping = p2.TOPPING_ID
+```
+## What was the most commonly added extra?
+```sql
+with cte as (SELECT pizza_id,
+       TRIM(REGEXP_SUBSTR(extras, '[^,]+', 1, LEVEL)) AS topping
+FROM customer_orders
+CONNECT BY REGEXP_SUBSTR(extras, '[^,]+', 1, LEVEL) IS NOT NULL
+AND PRIOR ORDER_ID = ORDER_ID
+AND PRIOR DBMS_RANDOM.VALUE IS NOT NULL
+ORDER BY ORDER_ID, LEVEL)
+SELECT  TOPPING_NAME, count(topping) as number_of_times_order
+from cte p1 join pizza_toppings p2 on p1.topping = p2.TOPPING_ID
+group by TOPPING_NAME order by number_of_times_order desc
+
+```
+## What was the most common exclusion?
+```sql
+with cte as (SELECT pizza_id,
+       TRIM(REGEXP_SUBSTR(EXCLUSIONS, '[^,]+', 1, LEVEL)) AS topping
+FROM customer_orders
+CONNECT BY REGEXP_SUBSTR(EXCLUSIONS, '[^,]+', 1, LEVEL) IS NOT NULL
+AND PRIOR ORDER_ID = ORDER_ID
+AND PRIOR DBMS_RANDOM.VALUE IS NOT NULL
+ORDER BY ORDER_ID, LEVEL)
+SELECT  TOPPING_NAME, count(topping) as number_of_times_excluded from cte p1 join pizza_toppings p2 on p1.topping = p2.TOPPING_ID
+group by TOPPING_NAME order by number_of_times_excluded desc
+```
+## Generate an order item for each record in the customers_orders table in the format of one of the following:
+  - Meat Lovers
+  - Meat Lovers - Exclude Beef
+  - Meat Lovers - Extra Bacon
+  - Meat Lovers - Exclude Cheese, Bacon - Extra Mushroom, Peppers
+```sql
+select c.order_id,c.pizza_id,PIZZA_NAME as order_item from customer_orders c join pizza_names p
+on c.pizza_id = p.pizza_id
+where c.pizza_id = 1
+union all 
+select c.order_id,c.pizza_id,'Meat Lovers - Exclude Beef' as order_item from customer_orders c join pizza_names p
+on c.pizza_id = p.pizza_id
+where c.pizza_id = 1 and EXCLUSIONS like '%3%'
+union all 
+select c.order_id,c.pizza_id,'Meat Lovers - Extra Bacon' as order_item from customer_orders c join pizza_names p
+on c.pizza_id = p.pizza_id
+where c.pizza_id = 1 and Extras like '%1%'
+union all 
+select c.order_id,c.pizza_id,'Meat Lovers - Exclude Cheese, Bacon - Extra Mushroom, Peppers' 
+as order_item from customer_orders c join pizza_names p
+on c.pizza_id = p.pizza_id
+where c.pizza_id = 1 and (EXCLUSIONS like '%1%' or EXCLUSIONS like '%4%') 
+or (Extras like '%6%' or Extras like '%9%')
+```
+<h1>D. Pricing and Ratings </h1>
+
+## If a Meat Lovers pizza costs $12 and Vegetarian costs $10 and there were no charges for changes - how much money has Pizza Runner made so far if there are no delivery fees?
+```sql
+select sum(case
+when PIZZA_ID=1 then 12
+else 10 end)
+as total_cost from customer_orders
+```
+## What if there was an additional $1 charge for any pizza extras?
+- Add cheese is $1 extra
+```sql
+select sum(case
+    when EXTRAS like '%4%' and PIZZA_ID=1 then 13
+    when EXTRAS like '%4%' and PIZZA_ID=2 then 11
+    when PIZZA_ID=1 then 12
+    when PIZZA_ID=2 then 10
+    end) 
+as total_cost from customer_orders
+
+```
+## If a Meat Lovers pizza was $12 and Vegetarian $10 fixed prices with no cost for extras and each runner is paid $0.30 per kilometre traveled - how much money does Pizza Runner have left over after these deliveries?
+```sql
+with cte as (select pizza_id, NVL(TO_NUMBER(REGEXP_REPLACE(r.DISTANCE, '[^0-9\.]', '')), 0) AS new_dist
+    from customer_orders c join runner_orders r
+on c.order_id = r.order_id)
+select sum(case
+   when PIZZA_ID=1 then (12-new_dist*0.3)
+   else (10-new_dist*0.3) 
+   end)
+as total_cost from cte 
 ```
