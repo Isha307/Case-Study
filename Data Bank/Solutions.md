@@ -40,14 +40,26 @@ sum(TXN_AMOUNT) as AVG_TXN_AMOUNT_FOR_DEPOSIT
 from customer_transactions where TXN_TYPE = 'deposit' group by CUSTOMER_ID)
 select avg(unique_count_for_deposit) AS avg_deposit_count,
 avg(AVG_TXN_AMOUNT_FOR_DEPOSIT) AS avg_total_deposit_amount
-from cte
+from cte;
 ```
 ## For each month - how many Data Bank customers make more than 1 deposit and either 1 purchase or 1 withdrawal in a single month?
 ```sql
+with cte as (select CUSTOMER_ID, extract(month from  TXN_DATE) as "MONTH",
+    case when TXN_TYPE = 'deposit' then 1 else 0 end as deposit,
+    case when TXN_TYPE = 'purchase' then 1 else 0 end as purchase,
+    case when TXN_TYPE = 'withdrawal' then 1 else 0 end as withdrawal
+from customer_transactions)
+select MONTH, count(CUSTOMER_ID) from cte
+where DEPOSIT > 1 AND (PURCHASE>0 OR WITHDRAWAL>0) group by MONTH;
+
 ```
 ## What is the closing balance for each customer at the end of the month?
 ```sql
+Select CUSTOMER_ID, extract(month from  TXN_DATE) as "MONTH",
+    sum(case when TXN_TYPE = 'deposit' then TXN_AMOUNT else TXN_AMOUNT*-1 end)  as tot_amount
+from customer_transactions group by CUSTOMER_ID, extract(month from  TXN_DATE);
 ```
 ## What is the percentage of customers who increase their closing balance by more than 5%?
 ```sql
+
 ```
