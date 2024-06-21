@@ -1,23 +1,23 @@
 # 1. Data Cleansing Steps
 ## Convert the week_date to a DATE format
-```
+```sql
 ALTER TABLE weekly_sales ADD (new_week_date DATE);
 UPDATE weekly_sales SET new_week_date = TO_DATE(week_date, 'YYYY-MM-DD');
 ALTER TABLE weekly_sales DROP COLUMN week_date;
 ALTER TABLE weekly_sales rename column new_week_date to week_date;
 ```
 ## Add a week_number as the second column for each week_date value, for example any value from the 1st of January to 7th of January will be 1, 8th to 14th will be 2 etc
-```
+```sql
 ALTER TABLE weekly_sales ADD (week_number INTEGER);
 UPDATE weekly_sales SET week_number = TO_NUMBER(TO_CHAR(WEEK_DATE, 'WW')); --Using WW for week of the year
 ```
 ## Add a month_number with the calendar month for each week_date value as the 3rd column
-```
+```sql
 ALTER TABLE weekly_sales ADD (month_number INTEGER);
 UPDATE weekly_sales SET month_number = TO_NUMBER(EXTRACT(month from WEEK_DATE));
 ```
 ## Add a calendar_year column as the 4th column containing either 2018, 2019 or 2020 values
-```
+```sql
 ALTER TABLE weekly_sales ADD (calendar_year INTEGER);
 UPDATE weekly_sales SET calendar_year = TO_NUMBER(EXTRACT(year from WEEK_DATE));
 ```
@@ -25,7 +25,7 @@ UPDATE weekly_sales SET calendar_year = TO_NUMBER(EXTRACT(year from WEEK_DATE));
 Segment | 1 | 2 | 3 or 4
 --- | --- | --- | --- 
 age_band  | Young Adults | Middle Aged | Retirees 
-```
+```sql
 ALTER TABLE weekly_sales ADD (age_band VARCHAR(20))
 UPDATE weekly_sales set age_band = substr(SEGMENT,2,2);
 UPDATE weekly_sales
@@ -40,7 +40,7 @@ SET age_band =
 Segment | C | F 
 --- | --- | --- 
 demographic  | Couple | Families 
-```
+```sql
 ALTER TABLE weekly_sales ADD (demographic VARCHAR(20))
 UPDATE weekly_sales set demographic = substr(SEGMENT,1,1)
 UPDATE weekly_sales
@@ -51,44 +51,44 @@ SET demographic =
     END;
 ```
 ## Ensure all null string values with an "unknown" string value in the original segment column as well as the new age_band and demographic columns
-```
+```sql
 UPDATE weekly_sales
 SET segment = COALESCE(NULLIF(segment, ''), 'unknown'),
     age_band = COALESCE(NULLIF(age_band, ''), 'unknown'),
     demographic = COALESCE(NULLIF(demographic, ''), 'unknown');
 ```
 ## Generate a new avg_transaction column as the sales value divided by transactions rounded to 2 decimal places for each record
-```
+```sql
 ALTER TABLE weekly_sales ADD (avg_transaction DECIMAL)
 UPDATE weekly_sales set avg_transaction = ROUND(SALES/TRANSACTIONS,2)
 ```
 
 # 2. Data Exploration
 ## What day of the week is used for each week_date value?
-```
+```sql
 SELECT DISTINCT(TO_CHAR(week_date, 'day')) AS week_day 
 FROM weekly_sales;
 ```
 ## What range of week numbers are missing from the dataset?
-```
+```sql
 ```
 ## How many total transactions were there for each year in the dataset?
-```
+```sql
 SELECT EXTRACT(year from WEEK_DATE) as "YEAR", sum(sales) as total_transaction
 FROM weekly_sales group by EXTRACT(year from WEEK_DATE);
 ```
 ## What is the total sales for each region for each month?
-```
+```sql
 SELECT REGION, EXTRACT(month from WEEK_DATE) as "MONTH", sum(sales) as total_transaction
 FROM weekly_sales group by REGION, EXTRACT(month from WEEK_DATE);
 ```
 ## What is the total count of transactions for each platform?
-```
+```sql
 SELECT PLATFORM, count(TRANSACTIONS) as total_transaction
 FROM weekly_sales group by PLATFORM;
 ```
 ## What is the percentage of sales for Retail vs Shopify for each month?
-```
+```sql
 with cte as (SELECT PLATFORM, EXTRACT(year from WEEK_DATE) as "YEAR", EXTRACT(month from WEEK_DATE) as "MONTH", 
 sum(TRANSACTIONS) as total_transaction
 FROM weekly_sales group by PLATFORM, EXTRACT(year from WEEK_DATE), EXTRACT(month from WEEK_DATE))
@@ -102,7 +102,7 @@ FROM cte
 GROUP BY YEAR, MONTH
 ```
 ## What is the percentage of sales by demographic for each year in the dataset?
-```
+```sql
 with cte as (SELECT REGION, EXTRACT(year from WEEK_DATE) as "YEAR",
 sum(TRANSACTIONS) as total_transaction
 FROM weekly_sales group by REGION, EXTRACT(year from WEEK_DATE))
@@ -124,7 +124,7 @@ FROM cte
 GROUP BY YEAR
 ```
 ## Which age_band and demographic values contribute the most to Retail sales?
-```
+```sql
 with cte as (SELECT DEMOGRAPHIC, EXTRACT(year from WEEK_DATE) as "YEAR",
 sum(TRANSACTIONS) as total_transaction
 FROM weekly_sales group by DEMOGRAPHIC, EXTRACT(year from WEEK_DATE))
@@ -138,7 +138,7 @@ FROM cte
 GROUP BY YEAR
 ```
 ## Can we use the avg_transaction column to find the average transaction size for each year for Retail vs Shopify? If not - how would you calculate it instead?
-```
+```sql
 SELECT 
   EXTRACT(year from WEEK_DATE) as "YEAR",
   platform, 
