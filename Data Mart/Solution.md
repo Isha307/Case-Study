@@ -62,3 +62,88 @@ SET segment = COALESCE(NULLIF(segment, ''), 'unknown'),
 ALTER TABLE weekly_sales ADD (avg_transaction DECIMAL)
 UPDATE weekly_sales set avg_transaction = ROUND(SALES/TRANSACTIONS,2)
 ```
+
+# 2. Data Exploration
+## What day of the week is used for each week_date value?
+```
+SELECT DISTINCT(TO_CHAR(week_date, 'day')) AS week_day 
+FROM weekly_sales;
+```
+## What range of week numbers are missing from the dataset?
+```
+```
+## How many total transactions were there for each year in the dataset?
+```
+SELECT EXTRACT(year from WEEK_DATE) as "YEAR", sum(sales) as total_transaction
+FROM weekly_sales group by EXTRACT(year from WEEK_DATE);
+```
+## What is the total sales for each region for each month?
+```
+SELECT REGION, EXTRACT(month from WEEK_DATE) as "MONTH", sum(sales) as total_transaction
+FROM weekly_sales group by REGION, EXTRACT(month from WEEK_DATE);
+```
+## What is the total count of transactions for each platform?
+```
+SELECT PLATFORM, count(TRANSACTIONS) as total_transaction
+FROM weekly_sales group by PLATFORM;
+```
+## What is the percentage of sales for Retail vs Shopify for each month?
+```
+with cte as (SELECT PLATFORM, EXTRACT(year from WEEK_DATE) as "YEAR", EXTRACT(month from WEEK_DATE) as "MONTH", 
+sum(TRANSACTIONS) as total_transaction
+FROM weekly_sales group by PLATFORM, EXTRACT(year from WEEK_DATE), EXTRACT(month from WEEK_DATE))
+select YEAR, MONTH,  ROUND(100 * MAX (CASE 
+      WHEN platform = 'Retail' THEN total_transaction ELSE NULL END) 
+    / SUM(total_transaction),2) AS retail_percentage,
+    ROUND(100 * MAX (CASE 
+      WHEN platform = 'Shopify' THEN total_transaction ELSE NULL END)
+    / SUM(total_transaction),2) AS shopify_percentage
+FROM cte
+GROUP BY YEAR, MONTH
+```
+## What is the percentage of sales by demographic for each year in the dataset?
+```
+with cte as (SELECT REGION, EXTRACT(year from WEEK_DATE) as "YEAR",
+sum(TRANSACTIONS) as total_transaction
+FROM weekly_sales group by REGION, EXTRACT(year from WEEK_DATE))
+select YEAR,  ROUND(100 * MAX (CASE 
+      WHEN platform = 'AFRICA' THEN total_transaction ELSE NULL END)/ SUM(total_transaction),2) AS Africa_percentage,
+    ROUND(100 * MAX (CASE 
+      WHEN platform = 'ASIA' THEN total_transaction ELSE NULL END)/ SUM(total_transaction),2) AS ASIA_percentage,
+    ROUND(100 * MAX (CASE 
+      WHEN platform = 'CANADA' THEN total_transaction ELSE NULL END)/ SUM(total_transaction),2) AS CANADA_percentage,
+    ROUND(100 * MAX (CASE 
+      WHEN platform = 'SOUTH AMERICA' THEN total_transaction ELSE NULL END)/ SUM(total_transaction),2) SA_percentage,
+    ROUND(100 * MAX (CASE 
+      WHEN platform = 'OCEANIA' THEN total_transaction ELSE NULL END)/ SUM(total_transaction),2) AS shopify_percentage.
+    ROUND(100 * MAX (CASE 
+      WHEN platform = 'USA' THEN total_transaction ELSE NULL END)/ SUM(total_transaction),2) AS USA_percentage,
+    ROUND(100 * MAX (CASE 
+      WHEN platform = 'EUROPE' THEN total_transaction ELSE NULL END)/ SUM(total_transaction),2) AS EUROPE_percentage
+FROM cte
+GROUP BY YEAR
+```
+## Which age_band and demographic values contribute the most to Retail sales?
+```
+with cte as (SELECT DEMOGRAPHIC, EXTRACT(year from WEEK_DATE) as "YEAR",
+sum(TRANSACTIONS) as total_transaction
+FROM weekly_sales group by DEMOGRAPHIC, EXTRACT(year from WEEK_DATE))
+select YEAR,  ROUND(100 * MAX (CASE 
+      WHEN DEMOGRAPHIC = 'unknown' THEN total_transaction ELSE NULL END)/ SUM(total_transaction),2) AS unknown_percentage,
+    ROUND(100 * MAX (CASE 
+      WHEN DEMOGRAPHIC = 'Couples' THEN total_transaction ELSE NULL END)/ SUM(total_transaction),2) AS Couples_percentage,
+    ROUND(100 * MAX (CASE 
+      WHEN DEMOGRAPHIC = 'Families' THEN total_transaction ELSE NULL END)/ SUM(total_transaction),2) AS Families_percentage
+FROM cte
+GROUP BY YEAR
+```
+## Can we use the avg_transaction column to find the average transaction size for each year for Retail vs Shopify? If not - how would you calculate it instead?
+```
+SELECT 
+  EXTRACT(year from WEEK_DATE) as "YEAR",
+  platform, 
+  ROUND(AVG(avg_transaction),0) AS avg_transaction_row, 
+  SUM(sales) / sum(transactions) AS avg_transaction_group
+FROM weekly_sales
+GROUP BY EXTRACT(year from WEEK_DATE), platform;
+```
